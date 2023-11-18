@@ -1,0 +1,439 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+//TODO: remove chatID, add categories table, add tags table. Global and individual tags.
+//Migrate the database
+//Progression regression chain
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("PRODTEST_DATABASE_URL")
+  //shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+// enum MovementCategory {
+//   GYMNASTICS
+//   WEIGHTLIFTING
+//   UNKNOWN
+// }
+
+// enum WorkoutCategory {
+//   GYMNASTICS
+//   WEIGHTLIFTING
+//   HYPERTROPHY
+//   METCON
+//   RECOVERY
+//   WARMUP
+//   COOLDOWN
+// }
+
+// enum TrainingType {
+//   CROSSFIT
+//   SANDC
+// }
+
+enum WEIGHTUNITS {
+  Pounds
+  Kilograms
+  poods
+  RepMaxFraction // %1RM
+  BodyWeight
+  PickLoad //User select the load.
+}
+
+enum DISTANCEUNITS {
+  Meters
+  Kilometers
+  Feet
+  Yards
+  Miles
+  Inches
+}
+
+enum HEIGHTUNITS {
+  Inches
+  Feet
+  Centimeters
+  Meters
+}
+
+enum DifficultyLevel {
+  EASY
+  MODERATE
+  HEAVY
+  HARD
+}
+
+enum WorkoutType {
+  AMRAP
+  EMOM
+  RFT
+  LOAD
+  QUALITY
+  NOSCORE
+}
+
+model MovementCategory {
+  id   String @id @default(uuid()) @db.VarChar(255)
+  name String
+
+  //Relationship with coach table
+  coach   CFCoach @relation(fields: [coachID], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  coachID String
+
+  //Each movement Category can be assigned to mutliple movements
+  movements CFMovement[]
+
+  //A coach can enter uniqe category. No dupilicates per coach
+  @@unique([name, coachID])
+}
+
+model WorkoutCategory {
+  id   String @id @default(uuid()) @db.VarChar(255)
+  name String
+
+  //Relationship with coach table
+  coach   CFCoach @relation(fields: [coachID], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  coachID String
+
+  workouts CFWorkout[]
+
+  @@unique([name, coachID])
+}
+
+model TrainingType {
+  id String @id @default(uuid()) @db.VarChar(255)
+
+  name String @unique
+
+  coach   CFCoach @relation(fields: [coachID], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  coachID String  @unique
+
+  athelete   CFAthele @relation(fields: [atheleteID], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  atheleteID String   @unique
+}
+
+// //Workout Type can be only one for now. This will decide the type of properties to show on UI components
+// model WorkoutType {
+//   id   String @id @default(uuid()) @db.VarChar(255)
+//   name String
+
+//   //Relationship with coach table
+//   coach   CFCoach @relation(fields: [coachID], references: [id], onDelete: Cascade, onUpdate: Cascade)
+//   coachID String
+
+//   //Relationship with coach table
+//   workouts CFWorkout[]
+
+//   @@unique([name, coachID])
+// }
+
+model AppVersion {
+  name           String  @id @db.VarChar(255)
+  iosVersion     String? @db.VarChar(255)
+  androidVersion String? @db.VarChar(255)
+}
+
+model CFCoach {
+  id               String   @id @default(uuid())
+  name             String
+  email            String   @unique
+  timeZone         String?
+  numberofTrainees Int?
+  gender           String?
+  contactNumber    String?
+  costPerMonth     Int?
+  currency         String?
+  imageKey         String?
+  isActive         Boolean?
+  highlights       String?  @db.Text
+  bio              String?  @db.Text
+
+  movements CFMovement[]
+  workouts  CFWorkout[]
+  programs  CFProgram[]
+  atheletes CFAthele[]
+
+  trainingType TrainingType?
+
+  movementCategories MovementCategory[]
+  workoutCategoreis  WorkoutCategory[]
+  //workoutTypes       WorkoutType[]
+
+  @@index([name, email])
+}
+
+model CFMovement {
+  id            String             @id @default(uuid()) @db.VarChar(255)
+  name          String             @db.VarChar(255)
+  videoURL      String?
+  label         String?
+  category      MovementCategory[]
+  tags          String?
+  equipment     String?
+  instructions  String?            @db.Text
+  visibilityAll Boolean            @default(false)
+  imageLink     String?
+
+  audioCues String?
+
+  //Relationship with coach table
+  coach   CFCoach? @relation(fields: [coachID], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  coachID String
+
+  progressions CFMovement[] @relation("ProgReg")
+  regressions  CFMovement[] @relation("ProgReg")
+
+  //Measurements recoded on the movements
+  measurements CFMeasureMovement[]
+
+  @@unique([coachID, name])
+  @@index([name, tags])
+}
+
+model CFMeasureMovement {
+  id           String @id @default(uuid()) @db.VarChar(255)
+  //measurement parameters. Can make them type {} and inclue but leaving it out
+  movementName String
+
+  reps Json? //Float {"1": val, "2": val, "3": val}
+
+  height      Json? //Float {"1": val, "2": val, "3": val}
+  heightUnits HEIGHTUNITS @default(Inches)
+
+  weight      Json? ////Float {"1": val, "2": val, "3": val}
+  weightUnits WEIGHTUNITS @default(Pounds)
+
+  distance      Json? ////Float {"1": val, "2": val, "3": val}
+  distanceUnits DISTANCEUNITS @default(Meters)
+
+  duration Json? //INT {"1": val, "2": val, "3": val}
+  calorie  Json? //INT {"1": val, "2": val, "3": val}
+
+  isMaxLoad Boolean @default(false)
+  isMaxReps Boolean @default(false)
+
+  movement   CFMovement @relation(fields: [movementID], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  movementID String
+
+  rounds CFRoundsWithMeasurements[]
+}
+
+model CFRoundsWithMeasurements {
+  id String @id @default(uuid()) @db.VarChar(255)
+
+  orderIdx Int
+
+  measurement   CFMeasureMovement @relation(fields: [measurementID], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  measurementID String
+
+  rounds   CFRound @relation(fields: [roundsID], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  roundsID String
+
+  @@unique([orderIdx, measurementID, roundsID])
+  @@index([orderIdx])
+}
+
+model CFRound {
+  id String @id @default(uuid()) @db.VarChar(255)
+
+  name      String  @default(" ")
+  numRounds Int     @default(1)
+  roundTime Int     @default(0)
+  restTime  Int     @default(0)
+  repsVary  Boolean @default(false)
+  loadVary  Boolean @default(false)
+
+  //Round can have many measurements
+
+  measurements CFRoundsWithMeasurements[]
+
+  workout CFWorkoutsWithRounds[]
+}
+
+model CFWorkoutsWithRounds {
+  id String @id @default(uuid()) @db.VarChar(255)
+
+  orderIdx Int
+
+  round   CFRound @relation(fields: [roundID], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  roundID String
+
+  workoutID String
+  workout   CFWorkout @relation(fields: [workoutID], references: [id], onUpdate: Cascade, onDelete: Cascade)
+
+  @@index([orderIdx])
+}
+
+model CFWorkout {
+  id String @id @default(uuid()) @db.VarChar(255)
+
+  name String
+
+  numRounds Int @default(1)
+  runTime   Int @default(0)
+  restTime  Int @default(0)
+
+  visibility       Boolean @default(false)
+  benchMark        Boolean @default(false)
+  expectedCalories Int?    @default(0)
+  //Round can have many measurements
+
+  description     String?           @db.Text
+  instructions    String?           @db.Text
+  //Each Workout belongs to a coach
+  coach           CFCoach           @relation(fields: [coachID], references: [id], onUpdate: Restrict, onDelete: Restrict)
+  coachID         String
+  workoutType     WorkoutType       @default(NOSCORE) //@relation(fields: [workoutTypeID], references: [id], onUpdate: Cascade)
+  //workoutTypeID   String
+  workoutCategory WorkoutCategory[]
+  dateCreated     DateTime?
+
+  rounds CFWorkoutsWithRounds[]
+
+  programs CFProgramsWithWorkouts[]
+
+  assignedWorkoutTracker CFAtheleWorkoutTracker[] @relation(name: "AssignedWorkouts")
+
+  finishedWorkoutTracker CFAtheleWorkoutTracker[] @relation(name: "FinishedWorkouts")
+}
+
+model CFProgram {
+  id   String @id @default(uuid()) @db.VarChar(255)
+  name String
+
+  creationDate  DateTime @default(now())
+  tags          String?
+  description   String?
+  visibilityAll Boolean  @default(false)
+
+  //Each program belongs to one coach
+  coach   CFCoach @relation(fields: [coachID], references: [id], onUpdate: Restrict, onDelete: Restrict)
+  coachID String
+
+  workouts CFProgramsWithWorkouts[]
+
+  programAssigmentTracker CFAtheleProgramTracker[]
+}
+
+model CFProgramsWithWorkouts {
+  id String @id @default(uuid()) @db.VarChar(255)
+
+  orderIdx Int
+
+  workout   CFWorkout @relation(fields: [workoutID], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  workoutID String
+
+  program   CFProgram @relation(fields: [programID], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  programID String
+}
+
+//USER SCHEMA
+//AHTLETE or USER
+model CFAthele {
+  id String @id @default(uuid()) @db.VarChar(255)
+
+  height               String?
+  weight               String?
+  email                String?
+  dateOfBirth          String?
+  lastLoginTime        String?
+  userName             String?
+  gender               String?
+  name                 String?
+  userImageKey         String?
+  contactNumber        String?
+  goal                 String?
+  trainedWithCoach     String?
+  activityLevel        String?
+  specialCircumstances String?
+  profession           String?
+  daysPerWeek          Int?
+  fCMToken             String?
+  timeZone             String?
+  trailDate            DateTime?
+  paymentStatus        String?
+  subscriptionID       String?
+  customerID           String?
+  nextBillingDate      DateTime?
+  frequency            String?
+  trainingMode         TrainingType?
+  isActive             Boolean?
+
+  //Relationship with coach table
+  coach   CFCoach? @relation(fields: [coachID], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  coachID String?
+
+  workoutsTracking        CFAtheleWorkoutTracker[]
+  assignedprogramTracking CFAtheleProgramTracker[]
+  performanceStats        CFAthelePerformanceStats[]
+}
+
+// Model that tracks workouts assigned and finished by a single atelete
+//
+model CFAtheleWorkoutTracker {
+  id String @id @default(uuid()) @db.VarChar(255)
+
+  athelete   CFAthele @relation(fields: [atheleteID], references: [id])
+  atheleteID String
+
+  workoutAssigned   CFWorkout @relation("AssignedWorkouts", fields: [workoutAssignedID], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  workoutAssignedID String
+  dateAssigned      DateTime
+  finished          Boolean
+  timeToFinish      Int?
+
+  workoutFinished   CFWorkout? @relation("FinishedWorkouts", fields: [workoutFinishedID], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  workoutFinishedID String?
+  dateFinished      DateTime?
+
+  scoreTime       DateTime?
+  scoreLoad       Int?
+  scoreReps       Int?
+  scoreRounds     Int?
+  difficultyLevel DifficultyLevel?
+  feedback        String?
+  rating          String?
+
+  @@index([dateAssigned, dateFinished])
+}
+
+model CFAtheleProgramTracker {
+  id String @id @default(uuid()) @db.VarChar(255)
+
+  athelete   CFAthele @relation(fields: [atheleteID], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  atheleteID String
+
+  programAssigned   CFProgram @relation(fields: [programAssignedID], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  programAssignedID String
+  dateAssigned      DateTime  @db.DateTime()
+  endDate           DateTime  @db.DateTime()
+  programDuration   Int?
+
+  isActive Boolean @default(false) @db.TinyInt
+}
+
+model CFAthelePerformanceStats {
+  id String @id @default(uuid()) @db.VarChar(255)
+
+  athelete   CFAthele @relation(fields: [atheleteID], references: [id])
+  atheleteID String   @unique
+
+  weeklyAdherence  Int @default(0)
+  monthlyAdherence Int @default(0)
+  globalAdherence  Int @default(0)
+
+  longestStreak          Int       @default(0)
+  longestStreakStartDate DateTime? @db.DateTime()
+  longestStreakEndDate   DateTime? @db.DateTime()
+
+  currentStreak Int @default(0)
+
+  totalReps     Int @default(0)
+  totalWorkouts Int @default(0)
+  totalDuration Int @default(0)
+  totalCalories Int @default(0)
+}
